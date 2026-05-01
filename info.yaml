@@ -1,56 +1,56 @@
-# Tiny Tapeout project information
+# Tiny Tapeout project info
+# https://tinytapeout.com
+
+---
 project:
-  title:        ""      # Project title
-  author:       ""      # Your name
-  discord:      ""      # Your discord username, for communication and automatically assigning you a Tapeout role (optional)
-  description:  ""      # One line description of what your project does
-  language:     "Verilog" # other examples include SystemVerilog, Amaranth, VHDL, etc
-  clock_hz:     0       # Clock frequency in Hz (or 0 if not applicable)
+  title:        "Adaptive Traffic Light Controller with Emergency Override"
+  author:       "Your Name"
+  discord:      ""       # optional: your Discord username
+  description:  |
+    FSM-based two-road traffic light controller with sensor-adaptive
+    green-phase extension and hardware emergency-vehicle priority override.
+    Implements 7 states: NS_GREEN, NS_YELLOW, EW_GREEN, EW_YELLOW,
+    EMRG_HOLD, EMRG_NS, EMRG_EW. Emergency preemption forces all-red
+    hold then grants a dedicated green window to the requesting axis.
+    Both N/S and E/W emergencies simultaneously detected; N/S has
+    priority with E/W serviced on subsequent EMRG_HOLD cycle.
+  language:     "Verilog"
+  clock_hz:     10000     # 10 kHz default; adjust to match your demo board
 
-  # How many tiles your design occupies? A single tile is about 167x108 uM.
-  tiles: "1x1"          # Valid values: 1x1, 1x2, 2x2, 3x2, 4x2, 6x2 or 8x2
-
-  # Your top module name must start with "tt_um_". Make it unique by including your github username:
-  top_module:  "tt_um_example"
-
-  # List your project's source files here.
-  # Source files must be in ./src and you must list each source file separately, one per line.
-  # Don't forget to also update `PROJECT_SOURCES` in test/Makefile.
+# Source files — list all .v files in src/
   source_files:
-    - "project.v"
+    - traffic_fsm.v
+    - tt_um_traffic_ctrl.v
 
-# The pinout of your project. Leave unused pins blank. DO NOT delete or add any pins.
-# This section is for the datasheet/website. Use descriptive names (e.g., RX, TX, MOSI, SCL, SEG_A, etc.).
-pinout:
-  # Inputs
-  ui[0]: ""
-  ui[1]: ""
-  ui[2]: ""
-  ui[3]: ""
-  ui[4]: ""
-  ui[5]: ""
-  ui[6]: ""
-  ui[7]: ""
+  top_module:  "tt_um_traffic_ctrl"   # MUST match the module name exactly
 
-  # Outputs
-  uo[0]: ""
-  uo[1]: ""
-  uo[2]: ""
-  uo[3]: ""
-  uo[4]: ""
-  uo[5]: ""
-  uo[6]: ""
-  uo[7]: ""
+# Pin documentation
+  inputs:
+    - "sensor_ns: vehicle sensor on N/S road (active high)"
+    - "sensor_ew: vehicle sensor on E/W road (active high)"
+    - "emrg_ns:   emergency vehicle on N/S axis (active high)"
+    - "emrg_ew:   emergency vehicle on E/W axis (active high)"
+    - "nc"
+    - "nc"
+    - "nc"
+    - "nc"
 
-  # Bidirectional pins
-  uio[0]: ""
-  uio[1]: ""
-  uio[2]: ""
-  uio[3]: ""
-  uio[4]: ""
-  uio[5]: ""
-  uio[6]: ""
-  uio[7]: ""
+  outputs:
+    - "sig_ns[0]: N/S GREEN  (high = green lit)"
+    - "sig_ns[1]: N/S YELLOW (high = yellow lit; both low = red)"
+    - "sig_ew[0]: E/W GREEN"
+    - "sig_ew[1]: E/W YELLOW"
+    - "emrg_active: high during any emergency FSM state"
+    - "state[0]: FSM state bit 0 (for 7-segment debug)"
+    - "state[1]: FSM state bit 1"
+    - "state[2]: FSM state bit 2"
 
-# Do not change!
-yaml_version: 6
+  bidirectional:
+    - "nc (input)"
+    - "nc (input)"
+    - "nc (input)"
+    - "nc (input)"
+    - "nc (input)"
+    - "nc (input)"
+    - "nc (input)"
+    - "nc (input)"
