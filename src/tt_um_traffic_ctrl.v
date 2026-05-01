@@ -87,4 +87,6 @@ module tt_um_traffic_ctrl (
     assign uo_out[4]   = emrg_active;
     assign uo_out[7:5] = state_out;
 
+    wire _unused = &{uio_in, 1'b0};
+
 endmodule
