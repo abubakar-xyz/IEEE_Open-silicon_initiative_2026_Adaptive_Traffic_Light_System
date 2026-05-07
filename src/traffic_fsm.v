@@ -63,14 +63,13 @@ module traffic_fsm #(
 );
 
 // ---------- state encoding ----------
-localparam [2:0]
-    NS_GREEN  = 3'd0,
-    NS_YELLOW = 3'd1,
-    EW_GREEN  = 3'd2,
-    EW_YELLOW = 3'd3,
-    EMRG_HOLD = 3'd4,
-    EMRG_NS   = 3'd5,
-    EMRG_EW   = 3'd6;
+localparam NS_GREEN  = 3'd0;
+localparam NS_YELLOW = 3'd1;
+localparam EW_GREEN  = 3'd2;
+localparam EW_YELLOW = 3'd3;
+localparam EMRG_HOLD = 3'd4;
+localparam EMRG_NS   = 3'd5;
+localparam EMRG_EW   = 3'd6;
 
 // ---------- signal encoding ----------
 localparam [1:0] SIG_RED    = 2'b00;
@@ -91,10 +90,18 @@ wire in_green_ns = (state == NS_GREEN);
 wire in_green_ew = (state == EW_GREEN);
 wire sensor_active = (in_green_ns && sensor_ns) || (in_green_ew && sensor_ew);
 wire can_extend = (timer <= MIN_REMAINING) && (green_limit + EXTEND_STEP <= MAX_GREEN) && !emrg_pending && sensor_active;
+wire timer_expired = (timer == 6'd0);
 
 always @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
-        state        <= NS_GREEN;
+        state <= NS_GREEN;
+    end else begin
+        state <= next_state;
+    end
+end
+
+always @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
         timer        <= GREEN_TIME;
         green_limit  <= GREEN_TIME;
         emrg_pending <= 1'b0;
@@ -104,10 +111,9 @@ always @(posedge clk or negedge rst_n) begin
             emrg_pending <= 1'b1;
         else if (state == EMRG_NS || state == EMRG_EW)
             emrg_pending <= 1'b0;
-    
-    
-        if (timer == 6'd0) begin
-            state       <= next_state;
+        
+        // Timer management (separate from state transition)
+        if (timer_expired) begin
             timer       <= timer_for(next_state);
             green_limit <= (next_state == NS_GREEN || next_state == EW_GREEN)
                        ? GREEN_TIME : green_limit;
@@ -139,49 +145,54 @@ endfunction
 // ============================================================
 // Combinational: next-state logic
 // Priority: emergency preemption > normal phase rotation
+// Textbook separated layout for FSM Viewers (no ternary ops)
 // ============================================================
 always @(*) begin
+    next_state = state; // Default to stay in current state
+    
     case (state)
         NS_GREEN: begin
-            if (emrg_pending)
-                next_state = EMRG_HOLD;
-            else
-                next_state = NS_YELLOW;
+            if (timer_expired) begin
+                if (emrg_pending) next_state = EMRG_HOLD;
+                else              next_state = NS_YELLOW;
+            end
         end
         NS_YELLOW: begin
-            if (emrg_pending)
-                next_state = EMRG_HOLD;
-            else
-                next_state = EW_GREEN;
+            if (timer_expired) begin
+                if (emrg_pending) next_state = EMRG_HOLD;
+                else              next_state = EW_GREEN;
+            end
         end
         EW_GREEN: begin
-            if (emrg_pending)
-                next_state = EMRG_HOLD;
-            else
-                next_state = EW_YELLOW;
+            if (timer_expired) begin
+                if (emrg_pending) next_state = EMRG_HOLD;
+                else              next_state = EW_YELLOW;
+            end
         end
         EW_YELLOW: begin
-            if (emrg_pending)
-                next_state = EMRG_HOLD;
-            else
-                next_state = NS_GREEN;
+            if (timer_expired) begin
+                if (emrg_pending) next_state = EMRG_HOLD;
+                else              next_state = NS_GREEN;
+            end
         end
         EMRG_HOLD: begin
-            // Grant green to whichever axis has the emergency vehicle.
-            // N/S takes priority if both axes signal simultaneously.
-            if (emrg_ns)
-                next_state = EMRG_NS;
-            else if (emrg_ew)
-                next_state = EMRG_EW;
-            else
-                next_state = NS_GREEN;  // spurious hold — resume normal
+            if (timer_expired) begin
+                if (emrg_ns)      next_state = EMRG_NS;
+                else if (emrg_ew) next_state = EMRG_EW;
+                else              next_state = NS_GREEN;
+            end
         end
         EMRG_NS: begin
-            // After emergency window, return to normal via all-red hold
-            next_state = (emrg_ew) ? EMRG_HOLD : NS_GREEN;
+            if (timer_expired) begin
+                if (emrg_ew) next_state = EMRG_HOLD;
+                else         next_state = NS_GREEN;
+            end
         end
         EMRG_EW: begin
-            next_state = (emrg_ns) ? EMRG_HOLD : EW_GREEN;
+            if (timer_expired) begin
+                if (emrg_ns) next_state = EMRG_HOLD;
+                else         next_state = EW_GREEN;
+            end
         end
         default: next_state = NS_GREEN;
     endcase
