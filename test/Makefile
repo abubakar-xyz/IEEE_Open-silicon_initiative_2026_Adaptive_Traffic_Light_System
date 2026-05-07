@@ -6,7 +6,7 @@ SIM ?= icarus
 FST ?= -fst # Use more efficient FST format
 TOPLEVEL_LANG ?= verilog
 SRC_DIR = $(PWD)/../src
-PROJECT_SOURCES = traffic_fsm.v tt_um_traffic_ctrl.v
+PROJECT_SOURCES = traffic_fsm.v tt_um_traffic_ctrl_top.v
 
 ifneq ($(GATES),yes)
 

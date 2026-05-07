@@ -13,7 +13,7 @@ project:
 
   source_files:
     - "traffic_fsm.v"
-    - "tt_um_traffic_ctrl.v"
+    - "tt_um_traffic_ctrl_top.v"
 
 pinout:
   # Inputs
