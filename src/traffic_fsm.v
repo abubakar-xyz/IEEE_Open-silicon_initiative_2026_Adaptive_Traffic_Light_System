@@ -33,15 +33,15 @@ module traffic_fsm #(
     parameter CLK_HZ        = 10_000,  // clock frequency (for real use)
 
     // Phase durations in clock cycles
-    parameter GREEN_TIME    = 30,
-    parameter YELLOW_TIME   = 5,
-    parameter HOLD_TIME     = 3,
-    parameter EMRG_TIME     = 20,
+    parameter [5:0] GREEN_TIME    = 6'd30,
+    parameter [5:0] YELLOW_TIME   = 6'd5,
+    parameter [5:0] HOLD_TIME     = 6'd3,
+    parameter [5:0] EMRG_TIME     = 6'd20,
 
     // Adaptive green extension
-    parameter MIN_REMAINING = 5,       // extend if remaining <= this
-    parameter EXTEND_STEP   = 10,
-    parameter MAX_GREEN     = 60
+    parameter [5:0] MIN_REMAINING = 6'd5,       // extend if remaining <= this
+    parameter [5:0] EXTEND_STEP   = 6'd10,
+    parameter [5:0] MAX_GREEN     = 6'd60
 )(
     input  wire clk,
     input  wire rst_n,
@@ -86,11 +86,17 @@ reg       emrg_pending; // latched emergency request
 // ============================================================
 // Sequential: state + timer update
 // ============================================================
+
+wire in_green_ns = (state == NS_GREEN);
+wire in_green_ew = (state == EW_GREEN);
+wire sensor_active = (in_green_ns && sensor_ns) || (in_green_ew && sensor_ew);
+wire can_extend = (timer <= MIN_REMAINING) && (green_limit + EXTEND_STEP <= MAX_GREEN) && !emrg_pending && sensor_active;
+
 always @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
         state        <= NS_GREEN;
-        timer        <= GREEN_TIME[5:0];
-        green_limit  <= GREEN_TIME[5:0];
+        timer        <= GREEN_TIME;
+        green_limit  <= GREEN_TIME;
         emrg_pending <= 1'b0;
     end else begin
         // Latch any emergency request; cleared when we enter an EMRG state
@@ -98,24 +104,18 @@ always @(posedge clk or negedge rst_n) begin
             emrg_pending <= 1'b1;
         else if (state == EMRG_NS || state == EMRG_EW)
             emrg_pending <= 1'b0;
-
+    
+    
         if (timer == 6'd0) begin
             state       <= next_state;
             timer       <= timer_for(next_state);
             green_limit <= (next_state == NS_GREEN || next_state == EW_GREEN)
-                           ? GREEN_TIME[5:0] : green_limit;
+                       ? GREEN_TIME : green_limit;
+        end else if (can_extend) begin
+            green_limit <= green_limit + EXTEND_STEP;
+            timer       <= timer + EXTEND_STEP;
         end else begin
-            // Adaptive extension: extend green if sensor active and time nearly up
-            if ((state == NS_GREEN && sensor_ns && !emrg_pending) ||
-                (state == EW_GREEN && sensor_ew && !emrg_pending)) begin
-                if (timer <= MIN_REMAINING[5:0] &&
-                    green_limit + EXTEND_STEP[5:0] <= MAX_GREEN[5:0]) begin
-                    green_limit <= green_limit + EXTEND_STEP[5:0];
-                    timer       <= timer + EXTEND_STEP[5:0];
-                end else
-                    timer <= timer - 6'd1;
-            end else
-                timer <= timer - 6'd1;
+            timer <= timer - 6'd1;
         end
     end
 end
@@ -123,17 +123,16 @@ end
 // ============================================================
 // Function: initial timer value for a given state
 // ============================================================
-function [5:0] timer_for;
-    input [2:0] s;
+function [5:0] timer_for(input [2:0] s);
     case (s)
-        NS_GREEN  : timer_for = GREEN_TIME[5:0];
-        NS_YELLOW : timer_for = YELLOW_TIME[5:0];
-        EW_GREEN  : timer_for = GREEN_TIME[5:0];
-        EW_YELLOW : timer_for = YELLOW_TIME[5:0];
-        EMRG_HOLD : timer_for = HOLD_TIME[5:0];
-        EMRG_NS   : timer_for = EMRG_TIME[5:0];
-        EMRG_EW   : timer_for = EMRG_TIME[5:0];
-        default   : timer_for = GREEN_TIME[5:0];
+        NS_GREEN  : timer_for = GREEN_TIME;
+        NS_YELLOW : timer_for = YELLOW_TIME;
+        EW_GREEN  : timer_for = GREEN_TIME;
+        EW_YELLOW : timer_for = YELLOW_TIME;
+        EMRG_HOLD : timer_for = HOLD_TIME;
+        EMRG_NS   : timer_for = EMRG_TIME;
+        EMRG_EW   : timer_for = EMRG_TIME;
+        default   : timer_for = GREEN_TIME;
     endcase
 endfunction
 
