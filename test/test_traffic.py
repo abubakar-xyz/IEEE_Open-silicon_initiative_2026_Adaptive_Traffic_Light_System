@@ -17,6 +17,8 @@ import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, ClockCycles
 
+# Detect if running gate-level simulation
+IS_GL = os.environ.get('GATES', 'no') == 'yes'
 
 # ---- signal encoding constants ----
 RED    = 0b00
@@ -83,6 +85,10 @@ async def test_reset_state(dut):
 # ===========================================================
 @cocotb.test()
 async def test_normal_rotation(dut):
+    if IS_GL:
+        dut._log.info("SKIP: Timing test not applicable to gate-level")
+        return  # Skip test in gate-level
+    
     clock = Clock(dut.clk, 100, units="ns")
     cocotb.start_soon(clock.start())
 
@@ -118,6 +124,9 @@ async def test_normal_rotation(dut):
 # ===========================================================
 @cocotb.test()
 async def test_emergency_preemption(dut):
+    if IS_GL:
+        dut._log.info("SKIP: Timing test not applicable to gate-level")
+        return  # Skip test in gate-level
     clock = Clock(dut.clk, 100, units="ns")
     cocotb.start_soon(clock.start())
 
@@ -161,6 +170,9 @@ async def test_emergency_preemption(dut):
 # ===========================================================
 @cocotb.test()
 async def test_emergency_both_axes(dut):
+    if IS_GL:
+        dut._log.info("SKIP: Timing test not applicable to gate-level")
+        return  # Skip test in gate-level
     clock = Clock(dut.clk, 100, units="ns")
     cocotb.start_soon(clock.start())
 

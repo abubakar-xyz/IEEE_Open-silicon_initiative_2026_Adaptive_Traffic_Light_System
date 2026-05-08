@@ -8,9 +8,6 @@ TOPLEVEL_LANG ?= verilog
 SRC_DIR = $(PWD)/../src
 PROJECT_SOURCES = traffic_fsm.v tt_um_traffic_ctrl_top.v
 
-# Force RTL simulation for tests
-GATES ?= no
-
 ifneq ($(GATES),yes)
 
 # RTL simulation:
