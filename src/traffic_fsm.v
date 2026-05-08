@@ -112,14 +112,14 @@ reg tick;                   // Slow tick for FSM
 always @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
         prescaler <= 0;
-        tick <= 0;
+        tick <= 1'b0;
     end else begin
         if (prescaler == CLOCK_DIV - 1) begin
             prescaler <= 0;
-            tick <= 1;
+            tick <= 1'b1;
         end else begin
             prescaler <= prescaler + 1;
-            tick <= 0;
+            tick <= 1'b0;
         end
     end
 end
