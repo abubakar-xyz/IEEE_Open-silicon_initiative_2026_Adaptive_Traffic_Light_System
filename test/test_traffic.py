@@ -92,6 +92,12 @@ async def test_normal_rotation(dut):
     await ClockCycles(dut.clk, GREEN_TIME + 2)
 
     sig_ns, sig_ew, _, state = decode_outputs(dut)
+    print(f"DEBUG: After {GREEN_TIME + 2} cycles:")
+    print(f"  sig_ns={sig_ns:02b} (expected YELLOW={YELLOW:02b})")
+    print(f"  state={state} (expected NS_YELLOW={NS_YELLOW})")
+
+
+    
     assert sig_ns == YELLOW, f"Expected NS YELLOW, got {sig_ns}"
     assert sig_ew == RED,    f"Expected EW RED, got {sig_ew}"
     assert state == NS_YELLOW, f"Expected NS_YELLOW state, got {state}"
