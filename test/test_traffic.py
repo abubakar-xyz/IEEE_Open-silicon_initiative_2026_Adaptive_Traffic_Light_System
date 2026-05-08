@@ -14,6 +14,7 @@ Tests
 """
 
 import cocotb
+import os
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, ClockCycles
 
