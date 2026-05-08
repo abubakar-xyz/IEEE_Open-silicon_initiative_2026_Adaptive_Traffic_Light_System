@@ -30,7 +30,7 @@
 // ============================================================
 
 module traffic_fsm #(
-    parameter CLK_HZ        = 10_000,  // clock frequency (for real use)
+    parameter CLK_HZ        = 10_000_000,  // clock frequency (for real use)
 
     // Phase durations in clock cycles
     parameter [5:0] GREEN_TIME    = 6'd30,
@@ -41,7 +41,10 @@ module traffic_fsm #(
     // Adaptive green extension
     parameter [5:0] MIN_REMAINING = 6'd5,       // extend if remaining <= this
     parameter [5:0] EXTEND_STEP   = 6'd10,
-    parameter [5:0] MAX_GREEN     = 6'd60
+    parameter [5:0] MAX_GREEN     = 6'd60,
+
+    // Configurable division ratio (can be input pins or parameter)
+    parameter CLOCK_DIV = 10_000_000  // 10 MHz ÷ 10M = 1 Hz → 1s ticks
 )(
     input  wire clk,
     input  wire rst_n,
@@ -81,6 +84,7 @@ reg [2:0] state, next_state;
 reg [5:0] timer;        // counts down to 0
 reg [5:0] green_limit;  // current green ceiling (adaptive)
 reg       emrg_pending; // latched emergency request
+reg       last_emrg_was_ns; // Tracks what emergency was last served
 
 // ============================================================
 // Sequential: state + timer update
@@ -100,11 +104,34 @@ always @(posedge clk or negedge rst_n) begin
     end
 end
 
+
+//  Clock Prescaler (converts fast clock to human-perceivable ticks)
+reg [23:0] prescaler;      // 24 bits handles up to ~10M division
+reg tick;                   // Slow tick for FSM
+
+always @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+        prescaler <= 0;
+        tick <= 0;
+    end else begin
+        if (prescaler == CLOCK_DIV - 1) begin
+            prescaler <= 0;
+            tick <= 1;
+        end else begin
+            prescaler <= prescaler + 1;
+            tick <= 0;
+        end
+    end
+end
+
+
+// State Memory
 always @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
         timer        <= GREEN_TIME;
         green_limit  <= GREEN_TIME;
         emrg_pending <= 1'b0;
+        last_emrg_was_ns <= 1'b0; // Initialise to prefer NS first
     end else begin
         // Latch any emergency request; cleared when we enter an EMRG state
         if (emrg_ns | emrg_ew)
@@ -113,15 +140,26 @@ always @(posedge clk or negedge rst_n) begin
             emrg_pending <= 1'b0;
         
         // Timer management (separate from state transition)
-        if (timer_expired) begin
-            timer       <= timer_for(next_state);
-            green_limit <= (next_state == NS_GREEN || next_state == EW_GREEN)
-                       ? GREEN_TIME : green_limit;
-        end else if (can_extend) begin
-            green_limit <= green_limit + EXTEND_STEP;
-            timer       <= timer + EXTEND_STEP;
-        end else begin
-            timer <= timer - 6'd1;
+        if (tick) begin
+            if (timer_expired) begin
+                timer       <= timer_for(next_state);
+                green_limit <= (next_state == NS_GREEN || next_state == EW_GREEN) ? GREEN_TIME : green_limit;
+            end else if (can_extend) begin
+                green_limit <= green_limit + EXTEND_STEP;
+                timer       <= timer + EXTEND_STEP;
+            end else begin
+                timer <= timer - 6'd1;
+            end 
+        end
+
+         // Track which emergency direction we're granting
+        if (state == EMRG_HOLD && timer_expired) begin
+            if (emrg_ns && !emrg_ew)
+                last_emrg_was_ns <= 1'b1;
+            else if (emrg_ew && !emrg_ns)
+                last_emrg_was_ns <= 1'b0;
+            else if (emrg_ns && emrg_ew)
+                last_emrg_was_ns <= !last_emrg_was_ns;  // Toggle for alternating priority
         end
     end
 end
@@ -177,11 +215,21 @@ always @(*) begin
         end
         EMRG_HOLD: begin
             if (timer_expired) begin
-                if (emrg_ns)      next_state = EMRG_NS;
-                else if (emrg_ew) next_state = EMRG_EW;
-                else              next_state = NS_GREEN;
+                if (emrg_ns && emrg_ew) begin
+                // Both asserted - alternate based on last served
+                if (last_emrg_was_ns)
+                    next_state = EMRG_EW;  // NS was last, give EW priority
+                else
+                    next_state = EMRG_NS;  // EW was last, give NS priority
+            end else if (emrg_ns) begin
+                next_state = EMRG_NS;
+            end else if (emrg_ew) begin
+                next_state = EMRG_EW;
+            end else begin
+                next_state = NS_GREEN;  // spurious hold - resume normal
             end
-        end
+    end
+end
         EMRG_NS: begin
             if (timer_expired) begin
                 if (emrg_ew) next_state = EMRG_HOLD;

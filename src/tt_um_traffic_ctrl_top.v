@@ -20,11 +20,23 @@
 //
 // Timing note
 // -----------
-// TT demo boards typically provide a 10 kHz clock via the RP2040.
-// At 10 kHz with GREEN_TIME=30 the green phase is 3 ms — fine for
-// demo. For realistic intersection timing swap parameters:
-//   10 kHz  × GREEN_TIME=300   →  30 s green
-//   10 kHz  × YELLOW_TIME=50   →   5 s yellow
+// TT demo boards provide a 10 MHz clock via the RP2040.
+// 
+// CURRENT CONFIG (for CI tests):
+//   CLOCK_DIV = 1 (no prescaling, direct clock)
+//   GREEN_TIME=30 cycles → 3 microseconds (too fast for humans)
+//   Tests validate FSM logic at simulation speed.
+//
+// FOR HARDWARE DEMO (30-second realistic timing):
+//   Change CLOCK_DIV to 10,000,000 below (line 71)
+//   10 MHz ÷ 10M = 1 Hz tick rate (1 second per tick)
+//   GREEN_TIME=30 ticks → 30 seconds green
+//   YELLOW_TIME=5 ticks → 5 seconds yellow
+//
+// FOR FASTER DEMO (3-second visible timing):
+//   Change CLOCK_DIV to 1,000,000
+//   10 MHz ÷ 1M = 10 Hz tick rate (100ms per tick)
+//   GREEN_TIME=30 ticks → 3 seconds green
 // ============================================================
 
 `default_nettype none
@@ -57,7 +69,8 @@ module tt_um_traffic_ctrl (
     wire [2:0] state_out;
 
     // ---- instantiate FSM ----
-    // Parameters tuned for a 10 kHz demo clock.
+    // Parameters tuned for a 10 MHz demo clock.
+    // COCOTB_SIM ifdef switches between fast test mode and realistic demo timing.
     // Multiply all time params by your clock frequency in Hz to get
     // real-world durations.
     traffic_fsm #(
@@ -67,7 +80,12 @@ module tt_um_traffic_ctrl (
         .EMRG_TIME   (20),   // cycles for emergency green window
         .MIN_REMAINING(5),   // extend green if ≤ this many cycles left
         .EXTEND_STEP (10),   // cycles to add per extension
-        .MAX_GREEN   (60)    // hard ceiling on green duration
+        .MAX_GREEN   (60),    // hard ceiling on green duration
+    `ifdef COCOTB_SIM
+        .CLOCK_DIV   (1)          // Test mode: direct clock, 30 cycles = 3µs
+    `else
+        .CLOCK_DIV   (10_000_000)   // Hardware: 1 Hz ticks, 30 ticks = 30s green
+    `endif
     ) u_fsm (
         .clk         (clk       ),
         .rst_n       (rst_n & ena),  // gate with ena: design goes idle when disabled

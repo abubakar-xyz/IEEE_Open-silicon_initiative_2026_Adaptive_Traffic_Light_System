@@ -5,7 +5,7 @@ project:
   discord:      ""
   description:  "FSM-based two-road traffic light controller with sensor-adaptive green-phase extension and hardware emergency-vehicle priority override."
   language:     "Verilog"
-  clock_hz:     10000
+  clock_hz:     10000000 # 10MHz "Set CLOCK_DIV=10M for realistic 30s timing"
 
   tiles: "1x1"
 
